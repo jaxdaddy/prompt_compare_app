@@ -1,0 +1,10 @@
+google-generativeai
+python-dotenv
+PyPDF2
+textstat
+requests
+beautifulsoup4
+lxml
+alpha-vantage
+sentence-transformers
+numpy<2.0
