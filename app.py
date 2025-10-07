@@ -6,6 +6,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 import PyPDF2
+import re
 import requests
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer, util
@@ -36,7 +37,28 @@ def main():
     initialize_database()
 
     # 2. COR Parsing
-    cor_file_path = "files/COR_Movers_2025-09-12.pdf"
+    files_directory = "files/"
+    cor_file_pattern = r"COR_Movers_(\d{4}-\d{2}-\d{2})\.pdf"
+    
+    newest_file = None
+    newest_date = None
+
+    for filename in os.listdir(files_directory):
+        match = re.match(cor_file_pattern, filename)
+        if match:
+            file_date_str = match.group(1)
+            file_date = datetime.strptime(file_date_str, "%Y-%m-%d").date()
+            
+            if newest_date is None or file_date > newest_date:
+                newest_date = file_date
+                newest_file = os.path.join(files_directory, filename)
+
+    if newest_file is None:
+        print(f"Error: No COR_Movers_YYYY-MM-DD.pdf files found in {files_directory}")
+        return
+
+    cor_file_path = newest_file
+    print(f"Automatically selected newest COR file: {cor_file_path}")
     print(f"Parsing COR file: {cor_file_path}")
     cor_content = read_pdf(cor_file_path)
     if not cor_content:
