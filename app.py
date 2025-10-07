@@ -9,12 +9,13 @@ import PyPDF2
 import re
 import requests
 from bs4 import BeautifulSoup
-from sentence_transformers import SentenceTransformer, util
+from pdf_generator import generate_pdf
 
 # --- CONFIGURATION ---
 load_dotenv()
 API_KEY = os.getenv("GEMINI_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 DB_NAME = "prompt_compare.db"
 DEBUG_MODE = True
 
@@ -90,6 +91,13 @@ def main():
     
     print(f"Summary A saved to: {summary_a_path}")
     print(f"Summary B saved to: {summary_b_path}")
+
+    # Generate PDF summaries
+    print("Generating PDF summaries...")
+    summary_a_pdf = os.path.join("output/", "summary_A.pdf")
+    summary_b_pdf = os.path.join("output/", "summary_B.pdf")
+    generate_pdf(summary_a_path, summary_a_pdf)
+    generate_pdf(summary_b_path, summary_b_pdf)
 
     # 6. Metric Calculation
     print("Calculating metrics...")
@@ -195,11 +203,24 @@ def fetch_financial_news(tickers, api_key):
     if DEBUG_MODE:
         tickers = tickers[:2] # Limit to 2 tickers in debug mode
         for ticker in tickers:
-            print(f"Generating dummy news for {ticker} in DEBUG_MODE...")
-            all_news += f"\n\n--- DUMMY NEWS FOR {ticker} ---\n"
-            all_news += f"Title: Dummy News Title for {ticker}\n"
-            all_news += f"URL: http://dummyurl.com/{ticker}\n"
-            all_news += f"Summary: This is placeholder news content for {ticker}. In non-debug mode, real financial news would be fetched from an API or scraped from a website.\n"
+            print(f"Fetching news for {ticker} using NewsAPI in DEBUG_MODE...")
+            try:
+                newsapi_url = f"https://newsapi.org/v2/everything?q={ticker} financial news&language=en&pageSize=3&apiKey={NEWSAPI_KEY}"
+                response = requests.get(newsapi_url)
+                data = response.json()
+
+                if data['status'] == 'ok' and data['articles']:
+                    print(f"  -> Found {len(data['articles'])} articles for {ticker}")
+                    for article in data['articles']:
+                        all_news += f"\n\n--- NEWS FOR {ticker} ---\n"
+                        all_news += f"Title: {article['title']}\n"
+                        all_news += f"Description: {article['description']}\n"
+                        all_news += f"URL: {article['url']}\n"
+                else:
+                    print(f"  -> No news found for {ticker} from NewsAPI.")
+            except Exception as e:
+                print(f"  -> Error fetching news for {ticker} from NewsAPI: {e}")
+            time.sleep(1) # Small delay for API calls
 
     else: # Use Alpha Vantage API in non-debug mode
         for ticker in tickers:
@@ -406,7 +427,7 @@ def generate_report():
             cursor.execute("SELECT * FROM metrics WHERE run_id = ?", (run_id,))
             metrics = cursor.fetchall()
             for metric in metrics:
-                report += f"  - Summary {metric[2]}: Reading Level={metric[3]}, Word Count={metric[4]}, Final Relevance={metric[8]}\n"
+                report += f"  - Summary {metric[2]}: Reading Level={metric[3]}, Word Count={metric[4]}, Final Relevance={metric[8]:.2f}\n"
                 report += f"    LLM Justification: {metric[5]}\n"
                 report += f"    LLM Score: {metric[6]}, Cosine Similarity: {metric[7]}\n"
             report += "\n"

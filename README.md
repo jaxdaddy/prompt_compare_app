@@ -25,15 +25,17 @@ This application compares two different prompts for generating financial news su
     *   A final combined relevance score is derived from these two metrics.
 
 *   **Debug Mode:**
-    *   When `DEBUG_MODE = True` in `app.py`, the application will generate dummy news content for a limited number of tickers. This allows for testing the application pipeline without hitting external API rate limits or requiring a valid Alpha Vantage API key.
+    *   When `DEBUG_MODE = True` in `.env`, the application will use NewsAPI to fetch news for a limited number of tickers. This allows for testing the application pipeline without hitting external API rate limits or requiring a valid Alpha Vantage API key.
     *   When `DEBUG_MODE = False`, the application attempts to fetch real financial news using the Alpha Vantage API. Be aware of Alpha Vantage's free tier rate limits (typically 25 requests per day).
 
 ## Output
 
-Upon successful execution, the application will generate the following files in the `output/` directory:
+Upon successful execution of `app.py`, the application will generate the following files in the `output/` directory:
 
 *   `news_summary_YYYYMMDD.txt`: Aggregated financial news content.
 *   `summary_A.txt`: Summaries generated using Prompt Set A.
 *   `summary_B.txt`: Summaries generated using Prompt Set B.
-*   `report.txt`: A detailed report of the last 5 runs, including all calculated metrics.
+*   `summary_A.pdf`: Styled PDF document for Summary A.
+*   `summary_B.pdf`: Styled PDF document for Summary B.
+*   `output/report.txt`: The final report with the metrics from the last 5 runs.
 *   `prompt_compare.db`: An SQLite database storing all run artifacts and metrics.
