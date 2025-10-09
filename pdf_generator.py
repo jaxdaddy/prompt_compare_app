@@ -126,8 +126,11 @@ def generate_pdf(input_txt_path, output_pdf_path):
             continue
 
         # Convert Markdown bold/italic to HTML-like tags for ReportLab
-        # Handle bold first, then italic, to ensure proper nesting if they overlap
-        processed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', stripped_line)
+        # First, clean up mixed bold/italic markers to ensure proper nesting
+        stripped_line = stripped_line.replace('**_', '***').replace('_**', '***')
+        # Handle bold-italic, then bold, then italic to ensure proper nesting
+        processed_line = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', stripped_line)
+        processed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', processed_line)
         processed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_line)
 
         # Check for sub-headers (###)

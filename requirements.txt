@@ -8,3 +8,7 @@ lxml
 alpha-vantage
 sentence-transformers
 numpy<2.0
+reportlab
+shiny
+pandas
+plotly

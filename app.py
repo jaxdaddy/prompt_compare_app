@@ -10,6 +10,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from pdf_generator import generate_pdf
+from sentence_transformers import SentenceTransformer, util
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -17,7 +18,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 DB_NAME = "prompt_compare.db"
-DEBUG_MODE = True
+DEBUG_MODE = os.getenv("DEBUG") == "True"
 
 # --- MAIN APPLICATION ---
 def main():
@@ -74,7 +75,7 @@ def main():
 
     # 3. News Collection
     print("Fetching financial news...")
-    news_summary_path = fetch_financial_news(tickers, ALPHA_VANTAGE_API_KEY)
+    news_summary_path = fetch_financial_news(tickers)
     if not news_summary_path:
         print("Could not fetch news. Exiting.")
         return
@@ -196,59 +197,47 @@ def extract_tickers(pdf_content):
         print(f"Error calling Gemini API for ticker extraction: {e}")
         return None
 
-def fetch_financial_news(tickers, api_key):
-    """Fetches financial news for a list of tickers and saves it to a file."""
+def fetch_financial_news(tickers):
+    """Fetches financial news for a list of tickers using NewsAPI and saves it to a file."""
+    
+    if not NEWSAPI_KEY:
+        print("Error: NEWSAPI_KEY not found in .env file.")
+        return None
+
     all_news = ""
     
     if DEBUG_MODE:
         tickers = tickers[:2] # Limit to 2 tickers in debug mode
-        for ticker in tickers:
-            print(f"Fetching news for {ticker} using NewsAPI in DEBUG_MODE...")
-            try:
-                newsapi_url = f"https://newsapi.org/v2/everything?q={ticker} financial news&language=en&pageSize=3&apiKey={NEWSAPI_KEY}"
-                response = requests.get(newsapi_url)
-                data = response.json()
+    
+    for ticker in tickers:
+        print(f"Fetching news for {ticker} using NewsAPI...")
+        try:
+            newsapi_url = f"https://newsapi.org/v2/everything?q={ticker} financial news&language=en&pageSize=3&apiKey={NEWSAPI_KEY}"
+            response = requests.get(newsapi_url)
+            data = response.json()
 
-                if data['status'] == 'ok' and data['articles']:
-                    print(f"  -> Found {len(data['articles'])} articles for {ticker}")
-                    for article in data['articles']:
-                        all_news += f"\n\n--- NEWS FOR {ticker} ---\n"
-                        all_news += f"Title: {article['title']}\n"
-                        all_news += f"Description: {article['description']}\n"
-                        all_news += f"URL: {article['url']}\n"
-                else:
-                    print(f"  -> No news found for {ticker} from NewsAPI.")
-            except Exception as e:
-                print(f"  -> Error fetching news for {ticker} from NewsAPI: {e}")
-            time.sleep(1) # Small delay for API calls
-
-    else: # Use Alpha Vantage API in non-debug mode
-        for ticker in tickers:
-            print(f"Fetching news for {ticker} using Alpha Vantage API...")
-            try:
-                url = f'https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers={ticker}&apikey={api_key}'
-                r = requests.get(url)
-                data = r.json()
-                print(f"  -> Response from Alpha Vantage: {data}")
-
-                if 'feed' in data and data['feed']:
-                    print(f"  -> Found {len(data['feed'])} articles for {ticker}")
-                    for article in data['feed']:
-                        all_news += f"\n\n--- NEWS FOR {ticker} ---\n"
-                        all_news += f"Title: {article['title']}\n"
-                        all_news += f"URL: {article['url']}\n"
-                        all_news += f"Summary: {article['summary']}\n"
-                else:
-                    print(f"  -> No news found for {ticker}")
-            except Exception as e:
-                print(f"  -> Error fetching news for {ticker}: {e}")
-            time.sleep(15) # Add a delay to avoid rate limiting
+            if data['status'] == 'ok' and data['articles']:
+                print(f"  -> Found {len(data['articles'])} articles for {ticker}")
+                for article in data['articles']:
+                    all_news += f"\n\n--- NEWS FOR {ticker} ---\n"
+                    all_news += f"Title: {article['title']}\n"
+                    all_news += f"Source: {article['source']['name']}\n"
+                    all_news += f"Description: {article['description']}\n"
+                    all_news += f"URL: {article['url']}\n"
+            elif data.get('code') == 'apiKeyInvalid':
+                print("Error: Invalid NewsAPI key.")
+                return None
+            else:
+                print(f"  -> No news found for {ticker} from NewsAPI.")
+        except Exception as e:
+            print(f"  -> Error fetching news for {ticker} from NewsAPI: {e}")
+        time.sleep(1) # Small delay for API calls
 
     if not all_news:
         return None
 
     # Save the aggregated news to a file
-    date_str = datetime.now().strftime("%Y%m%d")
+    date_str = datetime.now().strftime("%m%d%Y")
     file_path = f"output/news_summary_{date_str}.txt"
     try:
         with open(file_path, "w", encoding="utf-8") as f:
