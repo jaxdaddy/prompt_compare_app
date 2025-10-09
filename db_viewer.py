@@ -50,7 +50,7 @@ app_ui = ui.page_fluid(
                                 "reading_level": "Reading Level",
                                 "word_count": "Word Count",
                                 "llm_relevance_score": "LLM Relevance Score",
-                                "cosine_similarity_score": "Cosine Similarity Score",
+                                "cosine_similarity_score": "Cosine Similarity Score"
                             }),
         ),
         ui.h3("Metric Comparison for Selected Run"),
@@ -72,7 +72,7 @@ def server(input, output, session):
             print(f"First run ID: {runs_df['id'].iloc[0]}")
             ui.update_select("selected_run", choices=dict(zip(runs_df['id'], runs_df['display_name'])), selected=int(runs_df['id'].iloc[0]))
         else:
-            ui.update_select("selected_run", choices={}, selected=None)
+            ui.update_select("selected_run", choices={{}}, selected=None)
         print("Runs update complete.")
 
     # Initial load
@@ -114,6 +114,7 @@ def server(input, output, session):
 
     @render.ui
     def metric_trend_plot():
+        print(f"metric_trend_plot called with trend_metric: {input.trend_metric()}")
         req(input.trend_metric)
         all_metrics_df = get_all_metrics()
         

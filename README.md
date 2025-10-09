@@ -6,10 +6,11 @@ This application compares two different prompts for generating financial news su
 
 1.  Place your COR metric file (e.g., `COR_Movers_YYYY-MM-DD.pdf`), primer file (`options_primer.pdf`), and prompt set files (`prompt_set_a.txt`, `prompt_set_b.txt`) in the `files/` directory.
 
-2.  **API Keys:**
+2.  **API Keys & Configuration:**
     *   Create a `.env` file in the project root.
     *   Add your Gemini API key: `GEMINI_API_KEY=your_gemini_api_key_here` (Get it from [Google AI Studio](https://aistudio.google.com/)).
-    *   For non-debug mode, you will also need an Alpha Vantage API key. Get a free key from [https://www.alphavantage.co/support/#api-key](https://www.alphavantage.co/support/#api-key) and add it to your `.env` file: `ALPHA_VANTAGE_API_KEY=your_alphavantage_api_key_here`.
+    *   Add your NewsAPI key: `NEWSAPI_KEY=your_newsapi_key_here` (Get a free key from [https://newsapi.org/](https://newsapi.org/)).
+    *   Set the debug mode: `DEBUG=True` or `DEBUG=False`.
 
 3.  Install the required dependencies: `pip install -r requirements.txt`
 
@@ -19,14 +20,16 @@ This application compares two different prompts for generating financial news su
 
 *   **Automatic COR File Selection:** The application automatically identifies and selects the newest `COR_Movers_YYYY-MM-DD.pdf` file from the `files/` directory for processing.
 
+*   **News Fetching with NewsAPI:** The application uses NewsAPI exclusively to fetch recent financial news for the companies identified in the COR file.
+
 *   **Improved Relevance Ranking:** The relevance of generated summaries is now calculated using a combination of:
     *   **LLM Relevance Score:** A qualitative score (1-10) and justification provided by the Gemini LLM.
     *   **Cosine Similarity:** A quantitative measure of semantic similarity between the summary and the news articles, calculated using `sentence-transformers`.
     *   A final combined relevance score is derived from these two metrics.
 
 *   **Debug Mode:**
-    *   When `DEBUG_MODE = True` in `.env`, the application will use NewsAPI to fetch news for a limited number of tickers. This allows for testing the application pipeline without hitting external API rate limits or requiring a valid Alpha Vantage API key.
-    *   When `DEBUG_MODE = False`, the application attempts to fetch real financial news using the Alpha Vantage API. Be aware of Alpha Vantage's free tier rate limits (typically 25 requests per day).
+    *   When `DEBUG=True` in the `.env` file, the application will fetch news for only the first two company tickers. This allows for faster testing of the application pipeline.
+    *   When `DEBUG=False`, the application will fetch news for all identified tickers.
 
 ## Database Viewer (`db_viewer.py`)
 
@@ -34,9 +37,11 @@ This module provides a web-based interface (using Shiny for Python) to visualize
 
 ### Features
 
-*   **Run History:** View a list of all previous application runs.
-*   **Metric Comparison:** Side-by-side comparison of key metrics (reading level, word count, relevance scores) for Summary A and Summary B for a selected run.
-*   **Trend Analysis:** Interactive line charts showing the trend of selected metrics over time.
+*   **Tabbed Interface:** The UI is organized into two tabs for easy navigation:
+    *   **Comparison View:** Displays a side-by-side comparison of key metrics (reading level, word count, relevance scores) for Summary A and Summary B for a selected run.
+    *   **Metrics Graph View:** Shows interactive line charts displaying the trend of selected metrics over time.
+*   **Run History:** View a list of all previous application runs in the sidebar.
+*   **Data Refresh:** A "Refresh Data" button allows you to load the latest runs from the database without restarting the application.
 
 ### Usage
 
@@ -52,7 +57,7 @@ This will launch a local web server, and you can access the viewer in your brows
 
 Upon successful execution of `app.py`, the application will generate the following files in the `output/` directory:
 
-*   `news_summary_YYYYMMDD.txt`: Aggregated financial news content.
+*   `news_summary_mmddyyyy.txt`: Aggregated financial news content.
 *   `summary_A.txt`: Summaries generated using Prompt Set A.
 *   `summary_B.txt`: Summaries generated using Prompt Set B.
 *   `summary_A.pdf`: Styled PDF document for Summary A.
