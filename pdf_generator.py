@@ -45,23 +45,29 @@ body_style = ParagraphStyle(
     spaceAfter=0.05 * inch,
 )
 
-# --- PAGE TEMPLATE ---
-def page_template(canvas, doc):
-    canvas.saveState()
-    # Footer
-    footer_text = f"Page {doc.page}"
-    canvas.setFont('Helvetica', 9)
-    canvas.drawString(letter[0] - inch, 0.75 * inch, footer_text)
-    canvas.restoreState()
-
 def generate_pdf(input_txt_path, output_pdf_path):
     """Converts a text file into a styled PDF document."""
     doc = SimpleDocTemplate(output_pdf_path, pagesize=letter)
     story = []
 
+    def page_template_with_filename(canvas, doc):
+        canvas.saveState()
+        # Footer
+        page_num_text = f"Page {doc.page}"
+        canvas.setFont('Helvetica', 9)
+        canvas.drawString(letter[0] - inch, 0.75 * inch, page_num_text)
+
+        # Add filename to footer
+        file_name = os.path.basename(output_pdf_path)
+        canvas.setFont('Helvetica', 9)
+        canvas.setFillColorRGB(0, 0, 1) # Blue
+        canvas.drawCentredString(letter[0] / 2, 0.75 * inch, file_name)
+
+        canvas.restoreState()
+
     # Define frames for the page template
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id='normal')
-    doc.addPageTemplates([PageTemplate(id='OneCol', frames=frame, onPage=page_template)])
+    doc.addPageTemplates([PageTemplate(id='OneCol', frames=frame, onPage=page_template_with_filename)])
 
     with open(input_txt_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
@@ -97,11 +103,20 @@ def generate_pdf(input_txt_path, output_pdf_path):
             from reportlab.platypus import Table, TableStyle
             from reportlab.lib import colors
             if table_data:
-                table = Table(table_data)
+                # Wrap cell content in Paragraphs to allow for text wrapping
+                wrapped_table_data = []
+                for row in table_data:
+                    wrapped_row = [Paragraph(cell, body_style) for cell in row]
+                    wrapped_table_data.append(wrapped_row)
+
+                num_cols = len(wrapped_table_data[0])
+                col_widths = [doc.width / num_cols] * num_cols
+                table = Table(wrapped_table_data, colWidths=col_widths)
                 table.setStyle(TableStyle([
                     ('BACKGROUND', (0,0), (-1,0), colors.grey),
                     ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
                     ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                     ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
                     ('BOTTOMPADDING', (0,0), (-1,0), 12),
                     ('BACKGROUND', (0,1), (-1,-1), colors.beige),
@@ -132,6 +147,7 @@ def generate_pdf(input_txt_path, output_pdf_path):
         processed_line = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', stripped_line)
         processed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', processed_line)
         processed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_line)
+        processed_line = processed_line.replace('</b></i>', '</i></b>')
 
         # Check for sub-headers (###)
         if processed_line.startswith('### '):
@@ -169,11 +185,12 @@ def generate_pdf(input_txt_path, output_pdf_path):
 
 # --- MAIN EXECUTION ---
 if __name__ == "__main__":
-    summary_a_txt = os.path.join(OUTPUT_DIR, "summary_A.txt")
-    summary_b_txt = os.path.join(OUTPUT_DIR, "summary_B.txt")
+    date_str = datetime.now().strftime("_%Y%m%d")
+    summary_a_txt = os.path.join(OUTPUT_DIR, f"summary_A{date_str}.txt")
+    summary_b_txt = os.path.join(OUTPUT_DIR, f"summary_B{date_str}.txt")
 
-    summary_a_pdf = os.path.join(OUTPUT_DIR, "summary_A.pdf")
-    summary_b_pdf = os.path.join(OUTPUT_DIR, "summary_B.pdf")
+    summary_a_pdf = os.path.join(OUTPUT_DIR, f"summary_A{date_str}.pdf")
+    summary_b_pdf = os.path.join(OUTPUT_DIR, f"summary_B{date_str}.pdf")
 
     if os.path.exists(summary_a_txt):
         generate_pdf(summary_a_txt, summary_a_pdf)

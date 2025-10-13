@@ -95,8 +95,8 @@ def main():
 
     # Generate PDF summaries
     print("Generating PDF summaries...")
-    summary_a_pdf = os.path.join("output/", "summary_A.pdf")
-    summary_b_pdf = os.path.join("output/", "summary_B.pdf")
+    summary_a_pdf = summary_a_path.replace(".txt", ".pdf")
+    summary_b_pdf = summary_b_path.replace(".txt", ".pdf")
     generate_pdf(summary_a_path, summary_a_pdf)
     generate_pdf(summary_b_path, summary_b_pdf)
 
@@ -276,8 +276,9 @@ def generate_summaries(cor_content, primer_path, news_summary_path):
                 summary_b += generate_summary_from_prompt(prompt, cor_content, primer_content, news_summary)
                 summary_b += "\n\n---\n\n"
 
-        summary_a_path = "output/summary_A.txt"
-        summary_b_path = "output/summary_B.txt"
+        date_str = datetime.now().strftime("_%Y%m%d")
+        summary_a_path = f"output/summary_A{date_str}.txt"
+        summary_b_path = f"output/summary_B{date_str}.txt"
 
         with open(summary_a_path, "w", encoding="utf-8") as f:
             f.write(summary_a)
