@@ -23,7 +23,7 @@ def get_all_runs():
 
 def get_metrics_for_run(run_id):
     conn = sqlite3.connect(DB_NAME)
-    query = f"SELECT summary_type, reading_level, word_count, relevance_justification, llm_relevance_score, cosine_similarity_score, final_relevance_score FROM metrics WHERE run_id = {run_id}"
+    query = f"SELECT * FROM metrics WHERE run_id = {run_id}"
     metrics_df = pd.read_sql_query(query, conn)
     conn.close()
     return metrics_df
@@ -50,7 +50,14 @@ app_ui = ui.page_fluid(
                                 "reading_level": "Reading Level",
                                 "word_count": "Word Count",
                                 "llm_relevance_score": "LLM Relevance Score",
-                                "cosine_similarity_score": "Cosine Similarity Score"
+                                "cosine_similarity_score": "Cosine Similarity Score",
+                                "metric_alignment_score": "Metric Alignment Score",
+                                "data_relevance_score": "Data Relevance Score",
+                                "primer_consistency_score": "Primer Consistency Score",
+                                "structure_score": "Structure Score",
+                                "clarity_score": "Clarity Score",
+                                "writing_quality_score": "Writing Quality Score",
+                                "composite_score": "Composite Score"
                             }),
         ),
         ui.h3("Metric Comparison for Selected Run"),
@@ -99,7 +106,11 @@ def server(input, output, session):
             "Summary B": []
         }
 
-        for metric_name in ['reading_level', 'word_count', 'llm_relevance_score', 'cosine_similarity_score', 'final_relevance_score']:
+        for metric_name in [
+            'reading_level', 'word_count', 'llm_relevance_score', 'cosine_similarity_score', 'final_relevance_score',
+            'metric_alignment_score', 'data_relevance_score', 'primer_consistency_score', 'structure_score',
+            'clarity_score', 'writing_quality_score', 'composite_score'
+        ]:
             comparison_data["Metric"].append(metric_name.replace('_', ' ').title())
             comparison_data["Summary A"].append(metrics_df[metrics_df['summary_type'] == 'A'][metric_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'A'].empty else "N/A")
             comparison_data["Summary B"].append(metrics_df[metrics_df['summary_type'] == 'B'][metric_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'B'].empty else "N/A")
@@ -108,6 +119,15 @@ def server(input, output, session):
         comparison_data["Metric"].append("Relevance Justification")
         comparison_data["Summary A"].append(metrics_df[metrics_df['summary_type'] == 'A']['relevance_justification'].iloc[0].replace('\n', '<br>') if not metrics_df[metrics_df['summary_type'] == 'A'].empty else "N/A")
         comparison_data["Summary B"].append(metrics_df[metrics_df['summary_type'] == 'B']['relevance_justification'].iloc[0].replace('\n', '<br>') if not metrics_df[metrics_df['summary_type'] == 'B'].empty else "N/A")
+
+        # Add notes separately
+        for note_name in [
+            'metric_alignment_note', 'data_relevance_note', 'primer_consistency_note', 'structure_note',
+            'clarity_note', 'writing_quality_note'
+        ]:
+            comparison_data["Metric"].append(note_name.replace('_', ' ').title())
+            comparison_data["Summary A"].append(metrics_df[metrics_df['summary_type'] == 'A'][note_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'A'].empty else "N/A")
+            comparison_data["Summary B"].append(metrics_df[metrics_df['summary_type'] == 'B'][note_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'B'].empty else "N/A")
 
         comparison_df = pd.DataFrame(comparison_data)
         return ui.HTML(comparison_df.to_html(index=False, escape=False))

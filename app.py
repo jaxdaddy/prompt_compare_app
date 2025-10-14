@@ -10,6 +10,7 @@ import re
 import requests
 from bs4 import BeautifulSoup
 from pdf_generator import generate_pdf
+from summary_evaluator import evaluate_summary_text
 from sentence_transformers import SentenceTransformer, util
 
 # --- CONFIGURATION ---
@@ -158,6 +159,19 @@ def initialize_database():
                 llm_relevance_score REAL,
                 cosine_similarity_score REAL,
                 final_relevance_score REAL,
+                metric_alignment_score INTEGER,
+                metric_alignment_note TEXT,
+                data_relevance_score INTEGER,
+                data_relevance_note TEXT,
+                primer_consistency_score INTEGER,
+                primer_consistency_note TEXT,
+                structure_score INTEGER,
+                structure_note TEXT,
+                clarity_score INTEGER,
+                clarity_note TEXT,
+                writing_quality_score INTEGER,
+                writing_quality_note TEXT,
+                composite_score REAL,
                 FOREIGN KEY(run_id) REFERENCES runs(id)
             )
         """)
@@ -324,6 +338,10 @@ def calculate_metrics(summary_path, summary_type, news_summary_path):
         # Combine scores (e.g., 60% LLM, 40% cosine similarity)
         final_relevance_score = (llm_relevance_score * 0.6) + (cosine_similarity_score * 4) # Scale cosine to be out of 10
 
+        # New evaluation metrics
+        print(f"  -> Calculating new evaluation metrics...")
+        eval_metrics = evaluate_summary_text(summary_content)
+
         return {
             "summary_type": summary_type,
             "reading_level": reading_level,
@@ -331,7 +349,20 @@ def calculate_metrics(summary_path, summary_type, news_summary_path):
             "relevance_justification": relevance_justification,
             "llm_relevance_score": llm_relevance_score,
             "cosine_similarity_score": cosine_similarity_score,
-            "final_relevance_score": final_relevance_score
+            "final_relevance_score": final_relevance_score,
+            "metric_alignment_score": eval_metrics["relevance"]["Metric Alignment"][0],
+            "metric_alignment_note": eval_metrics["relevance"]["Metric Alignment"][1],
+            "data_relevance_score": eval_metrics["relevance"]["Data Relevance"][0],
+            "data_relevance_note": eval_metrics["relevance"]["Data Relevance"][1],
+            "primer_consistency_score": eval_metrics["relevance"]["Primer Consistency"][0],
+            "primer_consistency_note": eval_metrics["relevance"]["Primer Consistency"][1],
+            "structure_score": eval_metrics["readability"]["Structure"][0],
+            "structure_note": eval_metrics["readability"]["Structure"][1],
+            "clarity_score": eval_metrics["readability"]["Clarity"][0],
+            "clarity_note": eval_metrics["readability"]["Clarity"][1],
+            "writing_quality_score": eval_metrics["readability"]["Writing Quality"][0],
+            "writing_quality_note": eval_metrics["readability"]["Writing Quality"][1],
+            "composite_score": eval_metrics["composite_score"]
         }
     except Exception as e:
         print(f"Error calculating metrics: {e}")
@@ -389,10 +420,34 @@ def store_results(cor_file_path, primer_file_path, news_summary_path, summary_a_
 
         # Insert metrics
         metrics = [
-            (run_id, metrics_a['summary_type'], metrics_a['reading_level'], metrics_a['word_count'], metrics_a['relevance_justification'], metrics_a['llm_relevance_score'], metrics_a['cosine_similarity_score'], metrics_a['final_relevance_score']),
-            (run_id, metrics_b['summary_type'], metrics_b['reading_level'], metrics_b['word_count'], metrics_b['relevance_justification'], metrics_b['llm_relevance_score'], metrics_b['cosine_similarity_score'], metrics_b['final_relevance_score'])
+            (
+                run_id, metrics_a['summary_type'], metrics_a['reading_level'], metrics_a['word_count'], 
+                metrics_a['relevance_justification'], metrics_a['llm_relevance_score'], metrics_a['cosine_similarity_score'], 
+                metrics_a['final_relevance_score'], metrics_a['metric_alignment_score'], metrics_a['metric_alignment_note'],
+                metrics_a['data_relevance_score'], metrics_a['data_relevance_note'], metrics_a['primer_consistency_score'],
+                metrics_a['primer_consistency_note'], metrics_a['structure_score'], metrics_a['structure_note'],
+                metrics_a['clarity_score'], metrics_a['clarity_note'], metrics_a['writing_quality_score'],
+                metrics_a['writing_quality_note'], metrics_a['composite_score']
+            ),
+            (
+                run_id, metrics_b['summary_type'], metrics_b['reading_level'], metrics_b['word_count'],
+                metrics_b['relevance_justification'], metrics_b['llm_relevance_score'], metrics_b['cosine_similarity_score'],
+                metrics_b['final_relevance_score'], metrics_b['metric_alignment_score'], metrics_b['metric_alignment_note'],
+                metrics_b['data_relevance_score'], metrics_b['data_relevance_note'], metrics_b['primer_consistency_score'],
+                metrics_b['primer_consistency_note'], metrics_b['structure_score'], metrics_b['structure_note'],
+                metrics_b['clarity_score'], metrics_b['clarity_note'], metrics_b['writing_quality_score'],
+                metrics_b['writing_quality_note'], metrics_b['composite_score']
+            )
         ]
-        cursor.executemany("INSERT INTO metrics (run_id, summary_type, reading_level, word_count, relevance_justification, llm_relevance_score, cosine_similarity_score, final_relevance_score) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", metrics)
+        cursor.executemany("""
+            INSERT INTO metrics (
+                run_id, summary_type, reading_level, word_count, relevance_justification, 
+                llm_relevance_score, cosine_similarity_score, final_relevance_score, 
+                metric_alignment_score, metric_alignment_note, data_relevance_score, data_relevance_note, 
+                primer_consistency_score, primer_consistency_note, structure_score, structure_note, 
+                clarity_score, clarity_note, writing_quality_score, writing_quality_note, composite_score
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, metrics)
 
         conn.commit()
         conn.close()
@@ -412,14 +467,20 @@ def generate_report():
         report = "--- LATEST 5 RUNS ---\n\n"
         for run in runs:
             run_id = run[0]
-            report += f"Run ID: {run_id}, Date: {run[1]}, COR File: {run[2]}\n"
+            report += f"Run ID: {run[0]}, Date: {run[1]}, COR File: {run[2]}\n"
             
             cursor.execute("SELECT * FROM metrics WHERE run_id = ?", (run_id,))
             metrics = cursor.fetchall()
             for metric in metrics:
-                report += f"  - Summary {metric[2]}: Reading Level={metric[3]}, Word Count={metric[4]}, Final Relevance={metric[8]:.2f}\n"
+                report += f"  - Summary {metric[2]}: Reading Level={metric[3]}, Word Count={metric[4]}, Final Relevance={metric[8]:.2f}, Composite Score={metric[21]:.2f}\n"
                 report += f"    LLM Justification: {metric[5]}\n"
                 report += f"    LLM Score: {metric[6]}, Cosine Similarity: {metric[7]}\n"
+                report += f"    Metric Alignment: {metric[9]}/5 ({metric[10]})\n"
+                report += f"    Data Relevance: {metric[11]}/5 ({metric[12]})\n"
+                report += f"    Primer Consistency: {metric[13]}/5 ({metric[14]})\n"
+                report += f"    Structure: {metric[15]}/5 ({metric[16]})\n"
+                report += f"    Clarity: {metric[17]}/5 ({metric[18]})\n"
+                report += f"    Writing Quality: {metric[19]}/5 ({metric[20]})\n"
             report += "\n"
 
         print(report)

@@ -27,6 +27,11 @@ This application compares two different prompts for generating financial news su
     *   **Cosine Similarity:** A quantitative measure of semantic similarity between the summary and the news articles, calculated using `sentence-transformers`.
     *   A final combined relevance score is derived from these two metrics.
 
+*   **Automated Summary Evaluation:** The application includes a `summary_evaluator` module that provides a detailed analysis of the generated summaries based on a set of predefined metrics. These metrics include:
+    *   **Relevance:** Metric Alignment, Data Relevance, and Primer Consistency.
+    *   **Readability:** Structure, Clarity, and Writing Quality.
+    *   A final **Composite Score** is calculated based on a weighted average of the relevance and readability scores.
+
 *   **Debug Mode:**
     *   When `DEBUG=True` in the `.env` file, the application will fetch news for only the first two company tickers. This allows for faster testing of the application pipeline.
     *   When `DEBUG=False`, the application will fetch news for all identified tickers.
@@ -38,8 +43,8 @@ This module provides a web-based interface (using Shiny for Python) to visualize
 ### Features
 
 *   **Tabbed Interface:** The UI is organized into two tabs for easy navigation:
-    *   **Comparison View:** Displays a side-by-side comparison of key metrics (reading level, word count, relevance scores) for Summary A and Summary B for a selected run.
-    *   **Metrics Graph View:** Shows interactive line charts displaying the trend of selected metrics over time.
+    *   **Comparison View:** Displays a side-by-side comparison of all key metrics, including reading level, word count, relevance scores, and the new detailed evaluation scores from the `summary_evaluator` module.
+    *   **Metrics Graph View:** Shows interactive line charts displaying the trend of selected metrics over time, including all the new evaluation scores.
 *   **Run History:** View a list of all previous application runs in the sidebar.
 *   **Data Refresh:** A "Refresh Data" button allows you to load the latest runs from the database without restarting the application.
 
@@ -58,9 +63,9 @@ This will launch a local web server, and you can access the viewer in your brows
 Upon successful execution of `app.py`, the application will generate the following files in the `output/` directory:
 
 *   `news_summary_mmddyyyy.txt`: Aggregated financial news content.
-*   `summary_A.txt`: Summaries generated using Prompt Set A.
-*   `summary_B.txt`: Summaries generated using Prompt Set B.
-*   `summary_A.pdf`: Styled PDF document for Summary A.
-*   `summary_B.pdf`: Styled PDF document for Summary B.
+*   `summary_A_yyyymmdd.txt`: Summaries generated using Prompt Set A.
+*   `summary_B_yyyymmdd.txt`: Summaries generated using Prompt Set B.
+*   `summary_A_yyyymmdd.pdf`: Styled PDF document for Summary A.
+*   `summary_B_yyyymmdd.pdf`: Styled PDF document for Summary B.
 *   `output/report.txt`: The final report with the metrics from the last 5 runs.
 *   `prompt_compare.db`: An SQLite database storing all run artifacts and metrics.
