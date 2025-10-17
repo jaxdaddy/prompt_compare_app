@@ -47,6 +47,7 @@ This module provides a web-based interface (using Shiny for Python) to visualize
     *   **Metrics Graph View:** Shows interactive line charts displaying the trend of selected metrics over time, including all the new evaluation scores.
 *   **Run History:** View a list of all previous application runs in the sidebar.
 *   **Data Refresh:** A "Refresh Data" button allows you to load the latest runs from the database without restarting the application.
+*   **File Paths:** The "Comparison View" also displays the file names and paths for the generated summary files.
 
 ### Usage
 

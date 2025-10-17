@@ -6,6 +6,14 @@ import sqlite3
 import pandas as pd
 import plotly.express as px
 from shiny import App, ui, render, reactive, req
+import os
+
+def get_artifacts_for_run(run_id):
+    conn = sqlite3.connect(DB_NAME)
+    query = f"SELECT file_name, file_path FROM artifacts WHERE run_id = {run_id}"
+    artifacts_df = pd.read_sql_query(query, conn)
+    conn.close()
+    return artifacts_df
 
 # --- CONFIGURATION ---
 DB_NAME = "prompt_compare.db"
@@ -95,6 +103,7 @@ def server(input, output, session):
         if not selected_run_id:
             return ui.p("Please select a run.")
         metrics_df = get_metrics_for_run(selected_run_id)
+        artifacts_df = get_artifacts_for_run(selected_run_id)
         
         if metrics_df.empty:
             return ui.p("No metrics found for this run.")
@@ -128,6 +137,19 @@ def server(input, output, session):
             comparison_data["Metric"].append(note_name.replace('_', ' ').title())
             comparison_data["Summary A"].append(metrics_df[metrics_df['summary_type'] == 'A'][note_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'A'].empty else "N/A")
             comparison_data["Summary B"].append(metrics_df[metrics_df['summary_type'] == 'B'][note_name].iloc[0] if not metrics_df[metrics_df['summary_type'] == 'B'].empty else "N/A")
+
+        # Add summary file paths
+        if not artifacts_df.empty:
+            summary_a_path = artifacts_df[artifacts_df['file_name'].str.contains('summary_A')]['file_path'].iloc[0]
+            summary_b_path = artifacts_df[artifacts_df['file_name'].str.contains('summary_B')]['file_path'].iloc[0]
+
+            comparison_data["Metric"].append("Summary File")
+            comparison_data["Summary A"].append(os.path.basename(summary_a_path))
+            comparison_data["Summary B"].append(os.path.basename(summary_b_path))
+
+            comparison_data["Metric"].append("File Path")
+            comparison_data["Summary A"].append(summary_a_path)
+            comparison_data["Summary B"].append(summary_b_path)
 
         comparison_df = pd.DataFrame(comparison_data)
         return ui.HTML(comparison_df.to_html(index=False, escape=False))

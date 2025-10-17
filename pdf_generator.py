@@ -7,6 +7,12 @@ from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.platypus.frames import Frame
+from bs4 import BeautifulSoup
+
+def clean_html(html_string):
+    """Uses BeautifulSoup to clean and fix malformed HTML tags."""
+    soup = BeautifulSoup(html_string, 'html.parser')
+    return str(soup)
 
 # --- CONFIGURATION ---
 OUTPUT_DIR = "output/"
@@ -148,6 +154,7 @@ def generate_pdf(input_txt_path, output_pdf_path):
         processed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', processed_line)
         processed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_line)
         processed_line = processed_line.replace('</b></i>', '</i></b>')
+        processed_line = clean_html(processed_line)
 
         # Check for sub-headers (###)
         if processed_line.startswith('### '):

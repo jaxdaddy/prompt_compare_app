@@ -60,6 +60,11 @@ def main():
         print(f"Error: No COR_Movers_YYYY-MM-DD.pdf files found in {files_directory}")
         return
 
+    if newest_date:
+        date_str = newest_date.strftime("%Y%m%d")
+    else:
+        date_str = datetime.now().strftime("%Y%m%d")
+
     cor_file_path = newest_file
     print(f"Automatically selected newest COR file: {cor_file_path}")
     print(f"Parsing COR file: {cor_file_path}")
@@ -76,7 +81,7 @@ def main():
 
     # 3. News Collection
     print("Fetching financial news...")
-    news_summary_path = fetch_financial_news(tickers)
+    news_summary_path = fetch_financial_news(tickers, date_str)
     if not news_summary_path:
         print("Could not fetch news. Exiting.")
         return
@@ -86,7 +91,7 @@ def main():
     # 4. Summary Generation
     print("Generating summaries...")
     primer_file_path = "files/options_primer.pdf"
-    summary_a_path, summary_b_path = generate_summaries(cor_content, primer_file_path, news_summary_path)
+    summary_a_path, summary_b_path = generate_summaries(cor_content, primer_file_path, news_summary_path, date_str)
     if not summary_a_path or not summary_b_path:
         print("Could not generate summaries. Exiting.")
         return
@@ -211,7 +216,7 @@ def extract_tickers(pdf_content):
         print(f"Error calling Gemini API for ticker extraction: {e}")
         return None
 
-def fetch_financial_news(tickers):
+def fetch_financial_news(tickers, date_str):
     """Fetches financial news for a list of tickers using NewsAPI and saves it to a file."""
     
     if not NEWSAPI_KEY:
@@ -251,7 +256,6 @@ def fetch_financial_news(tickers):
         return None
 
     # Save the aggregated news to a file
-    date_str = datetime.now().strftime("%m%d%Y")
     file_path = f"output/news_summary_{date_str}.txt"
     try:
         with open(file_path, "w", encoding="utf-8") as f:
@@ -261,7 +265,7 @@ def fetch_financial_news(tickers):
         print(f"Error saving news summary to file: {e}")
         return None
 
-def generate_summaries(cor_content, primer_path, news_summary_path):
+def generate_summaries(cor_content, primer_path, news_summary_path, date_str):
     """Generates summaries for two prompt sets and saves them to files."""
     try:
         primer_content = read_pdf(primer_path)
@@ -290,9 +294,8 @@ def generate_summaries(cor_content, primer_path, news_summary_path):
                 summary_b += generate_summary_from_prompt(prompt, cor_content, primer_content, news_summary)
                 summary_b += "\n\n---\n\n"
 
-        date_str = datetime.now().strftime("_%Y%m%d")
-        summary_a_path = f"output/summary_A{date_str}.txt"
-        summary_b_path = f"output/summary_B{date_str}.txt"
+        summary_a_path = f"output/summary_A_{date_str}.txt"
+        summary_b_path = f"output/summary_B_{date_str}.txt"
 
         with open(summary_a_path, "w", encoding="utf-8") as f:
             f.write(summary_a)
