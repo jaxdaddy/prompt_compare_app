@@ -59,14 +59,49 @@ shiny run db_viewer.py
 
 This will launch a local web server, and you can access the viewer in your browser (usually at `http://127.0.0.1:8000`).
 
-## Output
+## Google Drive Uploader (`gdrive_uploader.py`)
 
-Upon successful execution of `app.py`, the application will generate the following files in the `output/` directory:
+This utility script uploads one or more files or directories to a specified Google Drive folder.
 
-*   `news_summary_mmddyyyy.txt`: Aggregated financial news content.
-*   `summary_A_yyyymmdd.txt`: Summaries generated using Prompt Set A.
-*   `summary_B_yyyymmdd.txt`: Summaries generated using Prompt Set B.
-*   `summary_A_yyyymmdd.pdf`: Styled PDF document for Summary A.
-*   `summary_B_yyyymmdd.pdf`: Styled PDF document for Summary B.
-*   `output/report.txt`: The final report with the metrics from the last 5 runs.
-*   `prompt_compare.db`: An SQLite database storing all run artifacts and metrics.
+### Usage
+
+```bash
+python gdrive_uploader.py "Your Folder Name" /path/to/file_or_directory
+```
+
+To see the setup instructions, run:
+```bash
+python gdrive_uploader.py --setup
+```
+
+### Setup Instructions (OAuth 2.0)
+
+To use this script, you need to enable the Google Drive API and create an OAuth 2.0 Client ID.
+
+1.  **Enable the Google Drive API:**
+    *   Go to the Google Cloud Console: https://console.cloud.google.com/
+    *   Create a new project or select an existing one.
+    *   In the navigation menu, go to "APIs & Services" > "Library".
+    *   Search for "Google Drive API" and click "Enable".
+
+2.  **Configure the OAuth Consent Screen:**
+    *   In the navigation menu, go to "APIs & Services" > "OAuth consent screen".
+    *   Choose "External" and click "Create".
+    *   Fill in the required fields (App name, User support email, Developer contact information).
+    *   Click "SAVE AND CONTINUE" through the Scopes and Test users sections.
+    *   On the Summary page, click "BACK TO DASHBOARD" and then "PUBLISH APP" to make it available.
+
+3.  **Create an OAuth 2.0 Client ID:**
+    *   In the navigation menu, go to "APIs & Services" > "Credentials".
+    *   Click "+ CREATE CREDENTIALS" > "OAuth client ID".
+    *   For "Application type", select "Desktop app".
+    *   Give the client ID a name (e.g., "gdrive-uploader-desktop").
+    *   Click "CREATE".
+    *   A window will appear with your client ID and secret. Click "DOWNLOAD JSON".
+    *   **Rename the downloaded file to `credentials.json` and place it in the same directory as this script.**
+
+4.  **First Run and Authentication:**
+    *   The first time you run the script, it will open a web browser and ask you to log in to your Google account and grant permission to the script.
+    *   After you grant permission, a `token.json` file will be created in the same directory. This file stores your authentication tokens, so you won't have to log in every time.
+
+**IMPORTANT:** Do not share your `credentials.json` or `token.json` files with anyone.

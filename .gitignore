@@ -9,7 +9,7 @@ venv/
 
 # Secrets
 .env
-
+credentials.json
 # Data
 files/
 output/
