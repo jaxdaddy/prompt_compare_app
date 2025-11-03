@@ -59,6 +59,18 @@ shiny run db_viewer.py
 
 This will launch a local web server, and you can access the viewer in your browser (usually at `http://127.0.0.1:8000`).
 
+## PDF Merger (`pdf_merger.py`)
+
+This utility script combines the newest `COR_Movers` PDF and `summary_B` PDF into a single file.
+
+### Usage
+
+The script is called automatically at the end of the `app.py` run. You can also run it manually:
+
+```bash
+python pdf_merger.py
+```
+
 ## Google Drive Uploader (`gdrive_uploader.py`)
 
 This utility script uploads one or more files or directories to a specified Google Drive folder.

@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 
 def clean_html(html_string):
     """Uses BeautifulSoup to clean and fix malformed HTML tags."""
+    # First, do a simple string replacement for <br> tags for reportlab compatibility
+    html_string = html_string.replace("<br>", "<br/>")
     soup = BeautifulSoup(html_string, 'html.parser')
     return str(soup)
 
@@ -155,6 +157,7 @@ def generate_pdf(input_txt_path, output_pdf_path):
         processed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_line)
         processed_line = processed_line.replace('</b></i>', '</i></b>')
         processed_line = clean_html(processed_line)
+        processed_line = processed_line.replace('<br>', '<br/>')
 
         # Check for sub-headers (###)
         if processed_line.startswith('### '):

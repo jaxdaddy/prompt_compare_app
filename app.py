@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from pdf_generator import generate_pdf
 from summary_evaluator import evaluate_summary_text
 from sentence_transformers import SentenceTransformer, util
+from pdf_merger import main as merge_pdfs_main
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -121,6 +122,9 @@ def main():
     # 8. Reporting
     print("Generating report...")
     generate_report()
+
+    print("Merging PDFs...")
+    merge_pdfs_main()
 
     print("Application finished.")
 
