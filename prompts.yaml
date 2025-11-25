@@ -1,0 +1,41 @@
+file_types:
+  cor_movers:
+    pattern: "COR_Movers_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Standard Summary"
+        template: "files/prompt_cor_movers.txt"
+  cor_daily_top_and_bottom:
+    pattern: "COR_Daily_Top_And_Bottom_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Daily Brief"
+        template: "files/prompt_cor_daily_top_and_bottom.txt"
+  coy_movers:
+    pattern: "COY_Movers_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Standard Summary"
+        template: "files/prompt_coy_movers.txt"
+  coy_daily_top_and_bottom:
+    pattern: "COY_Daily_Top_And_Bottom_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Daily Brief"
+        template: "files/prompt_coy_daily_top_and_bottom.txt"
+  por_movers:
+    pattern: "POR_Movers_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Standard Summary"
+        template: "files/prompt_por_movers.txt"
+  por_daily_top_and_bottom:
+    pattern: "POR_Daily_Top_And_Bottom_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Daily Brief"
+        template: "files/prompt_por_daily_top_and_bottom.txt"
+  poy_movers:
+    pattern: "POY_Movers_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Standard Summary"
+        template: "files/prompt_poy_movers.txt"
+  poy_daily_top_and_bottom:
+    pattern: "POY_Daily_Top_And_Bottom_(\\d{4}-\\d{2}-\\d{2})\\.pdf"
+    prompts:
+      - name: "Daily Brief"
+        template: "files/prompt_poy_daily_top_and_bottom.txt"

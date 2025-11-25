@@ -1,0 +1,12 @@
+1. Market Movers Analysis (Quantitative)
+Analyze the attached COY Daily Top And Bottom Reports. Quantify the patterns among the top positive and negative movers. Calculate the percentage representation of each sector in the top movers. What are the key financial metrics or market data points that explain these movements? Provide a concise summary using Markdown bullet points with specific data points.
+
+
+2. Emerging Risk Signals (Quantitative)
+From the negative movers in the COY Daily Top And Bottom Reports, identify companies showing steep declines without clear supporting news in the NewsSummary. Suggest potential quantifiable risks (such as changes in trading volume, volatility, or short interest) that could be influencing these stocks. Provide your response as a Markdown bulleted list, with each risk and its associated data points clearly explained.
+
+3. Momentum & Sentiment Analysis (Quantitative)
+Compare the positive movers in the COY Daily Top And Bottom Reports with their recent news summaries. For each, quantify the sentiment of the news coverage (e.g., using a sentiment score from -1 to 1). Does the sentiment score correlate with the stock move? Present your analysis as a Markdown table with columns: Company, Stock Move, News Sentiment Score, Correlation Analysis.
+
+4. Strategic Investment Watchlist (Quantitative)
+Based on both the movers' data and the news coverage, create a shortlist of 5–7 companies worth monitoring for investment opportunities. For each, provide the company's key financial metrics (e.g., P/E ratio, market cap), the stock move, and a quantitative justification for why it should remain on a watchlist. Present this as a Markdown numbered list.

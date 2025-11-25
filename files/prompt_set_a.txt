@@ -1,0 +1,14 @@
+1. Market Movers Insight (Qualitative)
+Analyze the attached Corporate Movers Reports. Identify qualitative patterns among the top positive and negative movers. Which sectors or industries appear most consistently represented, and what are the likely market narratives explaining these movements? Provide a concise summary using Markdown bullet points for key findings and insights.
+
+2. Company-Specific News Impact (Qualitative)
+Cross-reference the ticker symbols in the Corporate Movers Reports with the NewsSummary file. Highlight which companies had significant stock moves but little or no associated news coverage. What qualitative risks or opportunities does this mismatch suggest? Provide your response as a Markdown table with columns: Symbol, Net Change, News Coverage, Qualitative Risks, Qualitative Opportunities.
+
+3. Emerging Risk Signals (Qualitative)
+From the negative movers in the Corporate Movers Reports, identify companies showing steep declines without clear supporting news in the NewsSummary. Suggest potential hidden qualitative risks (such as brand reputation, management changes, or competitive pressures) that could be influencing these stocks. Provide your response as a Markdown bulleted list, with each risk clearly explained.
+
+4. Momentum & Sentiment Analysis (Qualitative)
+Compare the positive movers in the Corporate Movers Reports with their recent news summaries. For each, evaluate whether the news coverage supports sustained momentum. Provide a sentiment rating (positive, neutral, negative) with qualitative reasoning. Present your analysis as a Markdown table with columns: Company, Stock Move, News Support, Sentiment Rating, Reasoning.
+
+5. Strategic Investment Watchlist (Qualitative)
+Based on both the movers’ data and the news coverage, create a shortlist of 5–7 companies worth monitoring for investment opportunities. For each, briefly summarize the stock move, related news drivers (if any), and your qualitative recommendation for why it should remain on a watchlist. Present this as a Markdown numbered list.
