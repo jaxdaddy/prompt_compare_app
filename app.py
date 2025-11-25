@@ -1,4 +1,5 @@
 import os
+import shutil
 import sqlite3
 import textstat
 import time
@@ -8,10 +9,19 @@ import google.generativeai as genai
 import PyPDF2
 import re
 import requests
+import yaml
+import argparse
 from bs4 import BeautifulSoup
 from pdf_generator import generate_pdf
 from summary_evaluator import evaluate_summary_text
-from sentence_transformers import SentenceTransformer, util
+from summary_evaluator import evaluate_summary_text
+try:
+    from sentence_transformers import SentenceTransformer, util
+    SENTENCE_TRANSFORMERS_AVAILABLE = True
+except ImportError:
+    SENTENCE_TRANSFORMERS_AVAILABLE = False
+    print("Warning: sentence-transformers not available. Cosine similarity will be mocked.")
+
 from pdf_merger import main as merge_pdfs_main
 
 # --- CONFIGURATION ---
@@ -20,11 +30,23 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 ALPHA_VANTAGE_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 DB_NAME = "prompt_compare.db"
-DEBUG_MODE = os.getenv("DEBUG") == "True"
+# Default debug mode can be overridden via command line flag
+DEBUG_MODE = os.getenv("DEBUG", "False") == "True"
+PROMPTS_FILE = "prompts.yaml"
 
 # --- MAIN APPLICATION ---
 def main():
     """Main function to run the application workflow."""
+    # Parse command line arguments for debug flag
+    parser = argparse.ArgumentParser(description="Prompt Compare Application")
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode (limit ticker processing)")
+    args = parser.parse_args()
+    # Override DEBUG_MODE if flag is provided
+    global DEBUG_MODE
+    if args.debug:
+        DEBUG_MODE = True
+        print("Debug mode enabled via command line flag.")
+
     print("Starting Prompt Compare application...")
 
     # 1. Project Setup
@@ -36,95 +58,161 @@ def main():
         print(f"Error configuring Gemini API: {e}")
         return
 
+    # Load Prompts Configuration
+    try:
+        with open(PROMPTS_FILE, 'r') as f:
+            config = yaml.safe_load(f)
+        print(f"Loaded configuration from {PROMPTS_FILE}")
+    except Exception as e:
+        print(f"Error loading prompts configuration: {e}")
+        return
+
     # 5. Database Setup
     print("Initializing database...")
     initialize_database()
 
-    # 2. COR Parsing
     files_directory = "files/"
-    cor_file_pattern = r"COR_Movers_(\d{4}-\d{2}-\d{2})\.pdf"
     
-    newest_file = None
-    newest_date = None
+    # Iterate through each file type defined in the configuration
+    for file_type_key, file_type_config in config.get('file_types', {}).items():
+        print(f"\n--- Processing File Type: {file_type_key} ---")
+        
+        file_pattern = file_type_config.get('pattern')
+        prompts = file_type_config.get('prompts', [])
+        
+        if not file_pattern or not prompts:
+            print(f"Skipping {file_type_key}: Missing pattern or prompts.")
+            continue
 
-    for filename in os.listdir(files_directory):
-        match = re.match(cor_file_pattern, filename)
-        if match:
-            file_date_str = match.group(1)
-            file_date = datetime.strptime(file_date_str, "%Y-%m-%d").date()
+        # 2. File Parsing (Generalized)
+        newest_file = None
+        newest_date = None
+
+        for filename in sorted(os.listdir(files_directory)):
+            # Skip directories such as the completed folder
+            if os.path.isdir(os.path.join(files_directory, filename)):
+                continue
+            match = re.match(file_pattern, filename)
+            if match:
+                file_date_str = match.group(1)
+                try:
+                    file_date = datetime.strptime(file_date_str, "%Y-%m-%d").date()
+                    if newest_date is None or file_date > newest_date:
+                        newest_date = file_date
+                        newest_file = os.path.join(files_directory, filename)
+                except ValueError:
+                    continue
+
+        if newest_file is None:
+            print(f"No files found matching pattern {file_pattern} in {files_directory}")
+            continue
+
+        if newest_date:
+            date_str = newest_date.strftime("%Y%m%d")
+        else:
+            date_str = datetime.now().strftime("%Y%m%d")
+
+        source_file_path = newest_file
+        print(f"Selected newest file: {source_file_path}")
+        print(f"Parsing file: {source_file_path}")
+        
+        # Assuming PDF for now based on current logic, could be generalized further
+        source_content = read_pdf(source_file_path)
+        if not source_content:
+            continue
+
+        tickers = extract_tickers(source_content)
+        if not tickers:
+            print("Could not extract tickers. Skipping.")
+            continue
+        
+        print(f"Extracted tickers: {tickers}")
+
+        # 3. News Collection
+        print("Fetching financial news...")
+        news_summary_path = fetch_financial_news(tickers, date_str)
+        if not news_summary_path:
+            print("Could not fetch news. Creating placeholder news file.")
+            news_summary_path = f"output/news_summary_{date_str}.txt"
+            with open(news_summary_path, "w", encoding="utf-8") as f:
+                f.write("No financial news available for this period.")
+        
+        print(f"News summary saved to: {news_summary_path}")
+
+        # 4. Summary Generation & Metrics
+        primer_file_path = "files/options_primer.pdf"
+        primer_content = read_pdf(primer_file_path) # Read once
+        
+        generated_summaries = []
+        
+        for prompt_config in prompts:
+            prompt_name = prompt_config.get('name')
+            prompt_template_path = prompt_config.get('template')
             
-            if newest_date is None or file_date > newest_date:
-                newest_date = file_date
-                newest_file = os.path.join(files_directory, filename)
+            if not prompt_name or not prompt_template_path:
+                continue
 
-    if newest_file is None:
-        print(f"Error: No COR_Movers_YYYY-MM-DD.pdf files found in {files_directory}")
-        return
+            # Load prompt from file
+            if os.path.exists(prompt_template_path):
+                print(f"Using prompt file: {prompt_template_path}")
+                try:
+                    with open(prompt_template_path, 'r', encoding='utf-8') as f:
+                        prompt_template = f.read()
+                except Exception as e:
+                    print(f"Error reading prompt file {prompt_template_path}: {e}")
+                    continue
+            else:
+                print(f"Warning: Prompt file '{prompt_template_path}' not found. Treating as inline template.")
+                prompt_template = prompt_template_path
+                
+            print(f"Generating summary for prompt: {prompt_name}...")
+            
+            # Read news summary content
+            with open(news_summary_path, "r", encoding="utf-8") as f:
+                news_summary_content = f.read()
 
-    if newest_date:
-        date_str = newest_date.strftime("%Y%m%d")
-    else:
-        date_str = datetime.now().strftime("%Y%m%d")
+            summary_text = generate_summary_from_prompt(prompt_template, source_content, primer_content, news_summary_content)
+            
+            safe_name = prompt_name.replace(" ", "_").replace("/", "-")
+            summary_filename = f"output/summary_{file_type_key}_{safe_name}_{date_str}.txt"
+            
+            with open(summary_filename, "w", encoding="utf-8") as f:
+                f.write(summary_text)
+            
+            print(f"Summary saved to: {summary_filename}")
+            
+            # Generate PDF
+            summary_pdf = summary_filename.replace(".txt", ".pdf")
+            generate_pdf(summary_filename, summary_pdf)
 
-    cor_file_path = newest_file
-    print(f"Automatically selected newest COR file: {cor_file_path}")
-    print(f"Parsing COR file: {cor_file_path}")
-    cor_content = read_pdf(cor_file_path)
-    if not cor_content:
-        return
+            # 6. Metric Calculation
+            print(f"Calculating metrics for {prompt_name}...")
+            metrics = calculate_metrics(summary_filename, prompt_name, news_summary_path)
+            
+            generated_summaries.append({
+                "path": summary_filename,
+                "metrics": metrics,
+                "name": prompt_name
+            })
 
-    tickers = extract_tickers(cor_content)
-    if not tickers:
-        print("Could not extract tickers. Exiting.")
-        return
-    
-    print(f"Extracted tickers: {tickers}")
-
-    # 3. News Collection
-    print("Fetching financial news...")
-    news_summary_path = fetch_financial_news(tickers, date_str)
-    if not news_summary_path:
-        print("Could not fetch news. Exiting.")
-        return
-    
-    print(f"News summary saved to: {news_summary_path}")
-
-    # 4. Summary Generation
-    print("Generating summaries...")
-    primer_file_path = "files/options_primer.pdf"
-    summary_a_path, summary_b_path = generate_summaries(cor_content, primer_file_path, news_summary_path, date_str)
-    if not summary_a_path or not summary_b_path:
-        print("Could not generate summaries. Exiting.")
-        return
-    
-    print(f"Summary A saved to: {summary_a_path}")
-    print(f"Summary B saved to: {summary_b_path}")
-
-    # Generate PDF summaries
-    print("Generating PDF summaries...")
-    summary_a_pdf = summary_a_path.replace(".txt", ".pdf")
-    summary_b_pdf = summary_b_path.replace(".txt", ".pdf")
-    generate_pdf(summary_a_path, summary_a_pdf)
-    generate_pdf(summary_b_path, summary_b_pdf)
-
-    # 6. Metric Calculation
-    print("Calculating metrics...")
-    metrics_a = calculate_metrics(summary_a_path, "A", news_summary_path)
-    metrics_b = calculate_metrics(summary_b_path, "B", news_summary_path)
-
-    print(f"Metrics for Summary A: {metrics_a}")
-    print(f"Metrics for Summary B: {metrics_b}")
-
-    # 7. Store Results
-    print("Storing results in database...")
-    store_results(cor_file_path, primer_file_path, news_summary_path, summary_a_path, summary_b_path, metrics_a, metrics_b)
+        # 7. Store Results
+        print("Storing results in database...")
+        store_results(source_file_path, primer_file_path, news_summary_path, generated_summaries)
+        # Move processed file to completed directory
+        completed_dir = os.path.join(files_directory, "completed")
+        os.makedirs(completed_dir, exist_ok=True)
+        shutil.move(source_file_path, os.path.join(completed_dir, os.path.basename(source_file_path)))
 
     # 8. Reporting
     print("Generating report...")
     generate_report()
 
-    print("Merging PDFs...")
-    merge_pdfs_main()
+    # PDF Merger might need adjustment or removal if it strictly expects A/B
+    # For now, we'll comment it out or leave it if it's generic enough, 
+    # but the original code hardcoded summary_B. 
+    # Let's skip it to avoid errors until it's generalized.
+    # print("Merging PDFs...")
+    # merge_pdfs_main()
 
     print("Application finished.")
 
@@ -229,8 +317,10 @@ def fetch_financial_news(tickers, date_str):
 
     all_news = ""
     
+    # Respect debug mode: limit to two tickers to avoid exhausting NewsAPI calls
     if DEBUG_MODE:
-        tickers = tickers[:2] # Limit to 2 tickers in debug mode
+        tickers = tickers[:2]
+        print(f"Debug mode active: limiting news fetching to first {len(tickers)} tickers.")
     
     for ticker in tickers:
         print(f"Fetching news for {ticker} using NewsAPI...")
@@ -269,53 +359,9 @@ def fetch_financial_news(tickers, date_str):
         print(f"Error saving news summary to file: {e}")
         return None
 
-def generate_summaries(cor_content, primer_path, news_summary_path, date_str):
-    """Generates summaries for two prompt sets and saves them to files."""
-    try:
-        primer_content = read_pdf(primer_path)
-        if not primer_content:
-            print("Could not read primer file.")
-            return None, None
-
-        with open(news_summary_path, "r", encoding="utf-8") as f:
-            news_summary = f.read()
-
-        with open("files/prompt_set_a.txt", "r", encoding="utf-8") as f:
-            prompts_a = f.read().split("\n\n")
-        
-        with open("files/prompt_set_b.txt", "r", encoding="utf-8") as f:
-            prompts_b = f.read().split("\n\n")
-
-        summary_a = ""
-        for prompt in prompts_a:
-            if prompt.strip():
-                summary_a += generate_summary_from_prompt(prompt, cor_content, primer_content, news_summary)
-                summary_a += "\n\n---\n\n"
-
-        summary_b = ""
-        for prompt in prompts_b:
-            if prompt.strip():
-                summary_b += generate_summary_from_prompt(prompt, cor_content, primer_content, news_summary)
-                summary_b += "\n\n---\n\n"
-
-        summary_a_path = f"output/summary_A_{date_str}.txt"
-        summary_b_path = f"output/summary_B_{date_str}.txt"
-
-        with open(summary_a_path, "w", encoding="utf-8") as f:
-            f.write(summary_a)
-        
-        with open(summary_b_path, "w", encoding="utf-8") as f:
-            f.write(summary_b)
-
-        return summary_a_path, summary_b_path
-
-    except Exception as e:
-        print(f"Error generating summaries: {e}")
-        return None, None
-
 def generate_summary_from_prompt(prompt, cor_content, primer_content, news_summary):
     """Generates a summary for a single prompt using the Gemini API."""
-    print(f"Generating summary for prompt: {prompt[:50]}...")
+    # print(f"Generating summary for prompt: {prompt[:50]}...")
     try:
         model = genai.GenerativeModel('gemini-pro-latest')
         response = model.generate_content(f"{prompt}\n\nCOR Content:\n{cor_content}\n\nPrimer Content:\n{primer_content}\n\nNews Summary:\n{news_summary}")
@@ -401,11 +447,14 @@ def get_relevance_ranking(summary, news_summary):
 
 def get_cosine_similarity(text1, text2):
     """Calculates the cosine similarity between two texts."""
+    if not SENTENCE_TRANSFORMERS_AVAILABLE:
+        return 0.5 # Mock value
+        
     model = SentenceTransformer('all-MiniLM-L6-v2')
     embeddings = model.encode([text1, text2])
     return util.pytorch_cos_sim(embeddings[0], embeddings[1]).item()
 
-def store_results(cor_file_path, primer_file_path, news_summary_path, summary_a_path, summary_b_path, metrics_a, metrics_b):
+def store_results(cor_file_path, primer_file_path, news_summary_path, generated_summaries):
     """Stores artifacts and metrics in the database."""
     try:
         conn = sqlite3.connect(DB_NAME)
@@ -415,37 +464,35 @@ def store_results(cor_file_path, primer_file_path, news_summary_path, summary_a_
         cursor.execute("INSERT INTO runs (cor_file_id) VALUES (?)", (os.path.basename(cor_file_path),))
         run_id = cursor.lastrowid
 
-        # Insert artifacts
-        artifacts = [
+        # Insert common artifacts
+        common_artifacts = [
             (run_id, os.path.basename(cor_file_path), cor_file_path),
             (run_id, os.path.basename(primer_file_path), primer_file_path),
             (run_id, os.path.basename(news_summary_path), news_summary_path),
-            (run_id, os.path.basename(summary_a_path), summary_a_path),
-            (run_id, os.path.basename(summary_b_path), summary_b_path)
         ]
-        cursor.executemany("INSERT INTO artifacts (run_id, file_name, file_path) VALUES (?, ?, ?)", artifacts)
+        cursor.executemany("INSERT INTO artifacts (run_id, file_name, file_path) VALUES (?, ?, ?)", common_artifacts)
 
-        # Insert metrics
-        metrics = [
-            (
-                run_id, metrics_a['summary_type'], metrics_a['reading_level'], metrics_a['word_count'], 
-                metrics_a['relevance_justification'], metrics_a['llm_relevance_score'], metrics_a['cosine_similarity_score'], 
-                metrics_a['final_relevance_score'], metrics_a['metric_alignment_score'], metrics_a['metric_alignment_note'],
-                metrics_a['data_relevance_score'], metrics_a['data_relevance_note'], metrics_a['primer_consistency_score'],
-                metrics_a['primer_consistency_note'], metrics_a['structure_score'], metrics_a['structure_note'],
-                metrics_a['clarity_score'], metrics_a['clarity_note'], metrics_a['writing_quality_score'],
-                metrics_a['writing_quality_note'], metrics_a['composite_score']
-            ),
-            (
-                run_id, metrics_b['summary_type'], metrics_b['reading_level'], metrics_b['word_count'],
-                metrics_b['relevance_justification'], metrics_b['llm_relevance_score'], metrics_b['cosine_similarity_score'],
-                metrics_b['final_relevance_score'], metrics_b['metric_alignment_score'], metrics_b['metric_alignment_note'],
-                metrics_b['data_relevance_score'], metrics_b['data_relevance_note'], metrics_b['primer_consistency_score'],
-                metrics_b['primer_consistency_note'], metrics_b['structure_score'], metrics_b['structure_note'],
-                metrics_b['clarity_score'], metrics_b['clarity_note'], metrics_b['writing_quality_score'],
-                metrics_b['writing_quality_note'], metrics_b['composite_score']
-            )
-        ]
+        # Insert summary artifacts and metrics
+        metrics_data = []
+        for item in generated_summaries:
+            summary_path = item['path']
+            metrics = item['metrics']
+            
+            # Insert summary artifact
+            cursor.execute("INSERT INTO artifacts (run_id, file_name, file_path) VALUES (?, ?, ?)", 
+                           (run_id, os.path.basename(summary_path), summary_path))
+            
+            # Prepare metrics data
+            metrics_data.append((
+                run_id, metrics['summary_type'], metrics['reading_level'], metrics['word_count'], 
+                metrics['relevance_justification'], metrics['llm_relevance_score'], metrics['cosine_similarity_score'], 
+                metrics['final_relevance_score'], metrics['metric_alignment_score'], metrics['metric_alignment_note'],
+                metrics['data_relevance_score'], metrics['data_relevance_note'], metrics['primer_consistency_score'],
+                metrics['primer_consistency_note'], metrics['structure_score'], metrics['structure_note'],
+                metrics['clarity_score'], metrics['clarity_note'], metrics['writing_quality_score'],
+                metrics['writing_quality_note'], metrics['composite_score']
+            ))
+
         cursor.executemany("""
             INSERT INTO metrics (
                 run_id, summary_type, reading_level, word_count, relevance_justification, 
@@ -454,7 +501,7 @@ def store_results(cor_file_path, primer_file_path, news_summary_path, summary_a_
                 primer_consistency_score, primer_consistency_note, structure_score, structure_note, 
                 clarity_score, clarity_note, writing_quality_score, writing_quality_note, composite_score
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, metrics)
+        """, metrics_data)
 
         conn.commit()
         conn.close()

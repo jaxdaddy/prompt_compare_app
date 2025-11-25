@@ -4,21 +4,36 @@ This application compares two different prompts for generating financial news su
 
 ## Usage
 
-1.  Place your COR metric file (e.g., `COR_Movers_YYYY-MM-DD.pdf`), primer file (`options_primer.pdf`), and prompt set files (`prompt_set_a.txt`, `prompt_set_b.txt`) in the `files/` directory.
+1.  **Prepare Files:**
+    *   Place your data files in the `files/` directory. Supported types include:
+        *   `COR_Movers_YYYY-MM-DD.pdf`
+        *   `COR_Daily_Top_And_Bottom_YYYY-MM-DD.pdf`
+        *   `COY_Movers_YYYY-MM-DD.pdf`
+        *   `COY_Daily_Top_And_Bottom_YYYY-MM-DD.pdf`
+        *   `POR_Movers_YYYY-MM-DD.pdf`
+        *   `POR_Daily_Top_And_Bottom_YYYY-MM-DD.pdf`
+        *   `POY_Movers_YYYY-MM-DD.pdf`
+        *   `POY_Daily_Top_And_Bottom_YYYY-MM-DD.pdf`
+    *   Ensure the primer file `options_primer.pdf` is also in `files/`.
+    *   The application uses prompt files (e.g., `prompt_cor_movers.txt`) located in `files/`, configured via `prompts.yaml`.
 
 2.  **API Keys & Configuration:**
     *   Create a `.env` file in the project root.
     *   Add your Gemini API key: `GEMINI_API_KEY=your_gemini_api_key_here` (Get it from [Google AI Studio](https://aistudio.google.com/)).
     *   Add your NewsAPI key: `NEWSAPI_KEY=your_newsapi_key_here` (Get a free key from [https://newsapi.org/](https://newsapi.org/)).
-    *   Set the debug mode: `DEBUG=True` or `DEBUG=False`.
+    *   (Optional) Set default debug mode: `DEBUG=True`.
 
-3.  Install the required dependencies: `pip install -r requirements.txt`
+3.  **Install Dependencies:**
+    *   `pip install -r requirements.txt`
 
-4.  Run the application: `python app.py`
+4.  **Run the Application:**
+    *   Standard run: `python app.py`
+    *   Debug mode (limits news fetching to 2 tickers): `python app.py --debug`
 
 ## Features
 
-*   **Automatic COR File Selection:** The application automatically identifies and selects the newest `COR_Movers_YYYY-MM-DD.pdf` file from the `files/` directory for processing.
+*   **Automatic File Selection & Processing:** The application iterates through file types defined in `prompts.yaml` (e.g., COR, COY, POR, POY). For each type, it automatically selects the newest PDF file from the `files/` directory based on the date in the filename.
+    *   Processed files are automatically moved to a `files/completed/` directory to prevent re-processing.
 
 *   **News Fetching with NewsAPI:** The application uses NewsAPI exclusively to fetch recent financial news for the companies identified in the COR file.
 
@@ -33,8 +48,9 @@ This application compares two different prompts for generating financial news su
     *   A final **Composite Score** is calculated based on a weighted average of the relevance and readability scores.
 
 *   **Debug Mode:**
-    *   When `DEBUG=True` in the `.env` file, the application will fetch news for only the first two company tickers. This allows for faster testing of the application pipeline.
-    *   When `DEBUG=False`, the application will fetch news for all identified tickers.
+    *   Run with `python app.py --debug` or set `DEBUG=True` in `.env`.
+    *   Limits news fetching to the first two tickers per file to save API calls.
+    *   Provides a "Using prompt file..." indicator in the console.
 
 ## Database Viewer (`db_viewer.py`)
 

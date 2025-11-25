@@ -7,14 +7,6 @@ from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.platypus.frames import Frame
-from bs4 import BeautifulSoup
-
-def clean_html(html_string):
-    """Uses BeautifulSoup to clean and fix malformed HTML tags."""
-    # First, do a simple string replacement for <br> tags for reportlab compatibility
-    html_string = html_string.replace("<br>", "<br/>")
-    soup = BeautifulSoup(html_string, 'html.parser')
-    return str(soup)
 
 # --- CONFIGURATION ---
 OUTPUT_DIR = "output/"
@@ -52,6 +44,32 @@ body_style = ParagraphStyle(
     alignment=TA_LEFT,
     spaceAfter=0.05 * inch,
 )
+
+def clean_html(html_content):
+    """
+    Cleans HTML content by removing unsupported tags and attributes,
+    and handling basic HTML entities for ReportLab.
+    """
+    # Remove unsupported tags, keeping content
+    # Example: <p> tags are often not needed if content is already paragraph-like
+    html_content = re.sub(r'</?p>', '', html_content)
+
+    # Replace specific HTML entities
+    html_content = html_content.replace('&amp;', '&')
+    html_content = html_content.replace('&lt;', '<')
+    html_content = html_content.replace('&gt;', '>')
+    html_content = html_content.replace('&quot;', '"')
+    html_content = html_content.replace('&#x27;', "'") # Apostrophe
+
+    # Remove any remaining HTML tags that are not <b>, <i>, <u>, <font>, <br/>
+    # ReportLab's Paragraph can handle a limited set of HTML-like tags.
+    # We'll allow <b>, <i>, <u>, <font>, <br/> and remove others.
+    html_content = re.sub(r'<(?!b|/b|i|/i|u|/u|font|/font|br\s*/?)[^>]+>', '', html_content)
+    
+    # Remove attributes from allowed tags (e.g., <font color="red"> -> <font>)
+    html_content = re.sub(r'<(\/?(?:b|i|u|font))[^>]*>', r'<\1>', html_content)
+
+    return html_content
 
 def generate_pdf(input_txt_path, output_pdf_path):
     """Converts a text file into a styled PDF document."""
@@ -114,8 +132,16 @@ def generate_pdf(input_txt_path, output_pdf_path):
                 # Wrap cell content in Paragraphs to allow for text wrapping
                 wrapped_table_data = []
                 for row in table_data:
-                    wrapped_row = [Paragraph(cell, body_style) for cell in row]
-                    wrapped_table_data.append(wrapped_row)
+                    cleaned_row = []
+                    for cell in row:
+                        # Apply the same cleaning logic as for non-table content
+                        processed_cell = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', cell)
+                        processed_cell = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', processed_cell)
+                        processed_cell = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_cell)
+                        processed_cell = clean_html(processed_cell)
+                        processed_cell = processed_cell.replace('<br>', '<br/>')
+                        cleaned_row.append(Paragraph(processed_cell, body_style))
+                    wrapped_table_data.append(cleaned_row)
 
                 num_cols = len(wrapped_table_data[0])
                 col_widths = [doc.width / num_cols] * num_cols
@@ -149,13 +175,10 @@ def generate_pdf(input_txt_path, output_pdf_path):
             continue
 
         # Convert Markdown bold/italic to HTML-like tags for ReportLab
-        # First, clean up mixed bold/italic markers to ensure proper nesting
-        stripped_line = stripped_line.replace('**_', '***').replace('_**', '***')
         # Handle bold-italic, then bold, then italic to ensure proper nesting
         processed_line = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', stripped_line)
         processed_line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', processed_line)
         processed_line = re.sub(r'\*(.*?)\*', r'<i>\1</i>', processed_line)
-        processed_line = processed_line.replace('</b></i>', '</i></b>')
         processed_line = clean_html(processed_line)
         processed_line = processed_line.replace('<br>', '<br/>')
 
